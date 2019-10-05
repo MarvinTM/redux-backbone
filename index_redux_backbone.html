@@ -1,0 +1,193 @@
+<html>
+  <head>
+    <title>Redux testing test</title>
+    <script src="https://unpkg.com/redux@latest/dist/redux.js"></script>
+    <script src="https://underscorejs.org/underscore.js"></script>
+    <script src="https://backbonejs.org/backbone.js"></script>
+  </head>
+  <body>
+    <div>
+      <p>REDUX VIEW</p>
+      <p>DocumentNo: <span id="documentNo"></span></p>
+      <p>Customer: <span id="customer"></span></p>
+      <p>Lines: [<span id="lines"></span>]</p>
+      <p>Gross: <span id="gross"></span></p>
+      <p>
+        <button id="addline">Add line with redux</button>
+        <button id="removeline">Remove line with redux</button>
+      </p>
+    </div>
+
+    <div>
+      <p>BACKBONE VIEW</p>
+      <p>DocumentNo: <span id="documentNoBackbone"></span></p>
+      <p>Customer: <span id="customerBackbone"></span></p>
+      <p>Lines: [<span id="linesBackbone"></span>]</p>
+      <p>Gross: <span id="grossBackbone"></span></p>
+      <p>
+        <button id="addlinebackbone">Add line with Backbone</button>
+        <button id="removelinebackbone">Remove line with Backbone</button>
+      </p>
+    </div>
+    <script>
+      //BACKBONE INITIALIZATION
+
+      var receipt = new Backbone.Model({
+        documentNo: null,
+        customer: null,
+        lines: new Backbone.Collection(),
+        gross: 0
+      });
+
+      //REDUX INITIALIZATION
+
+      let seq = 0;
+
+      const getNewDocNo = function() {
+        return seq++;
+      };
+
+      const defaultState = {
+        totalGross: 0,
+        lines: [],
+        documentNo: null,
+        customer: "Anonymous"
+      };
+
+      const order = function(state = {}, action) {
+        function calculateGross(state) {
+          if (state.lines) {
+            state.totalGross = state.lines.reduce(
+              (total, line) => total + line.gross,
+              0
+            );
+          } else {
+            state.totalGross = 0;
+          }
+        }
+        let newState;
+        switch (action.type) {
+          case "SETDOCUMENTNO":
+            newState = { ...state };
+            newState.documentNo = getNewDocNo();
+            return newState;
+          case "ADDLINE":
+            newState = { ...state };
+            newState.lines = [...state.lines, action.line];
+            calculateGross(newState);
+            return newState;
+          case "REMOVELINE":
+            newState = { ...state };
+            const newLines = [...state.lines];
+            newLines.pop();
+            newState.lines = newLines;
+            calculateGross(newState);
+            return newState;
+          default:
+            return state;
+        }
+      };
+
+      const store = Redux.createStore(order, defaultState);
+
+      //REDUX-BACKBONE CONNECTION
+      function backboneCompatibilityLayer() {
+        let currentState = store.getState();
+        Object.keys(currentState).forEach(prop => {
+          if (currentState[prop] instanceof Array) {
+            receipt.get(prop).reset(currentState[prop]);
+          } else {
+            receipt.set(prop, currentState[prop]);
+          }
+        });
+      }
+
+      store.subscribe(backboneCompatibilityLayer);
+      receipt.get("lines").on("add", function(line, lines) {
+        store.dispatch({
+          type: "ADDLINE",
+          line: line.toJSON()
+        });
+      });
+      receipt.get("lines").on("remove", function(line, lines) {
+        store.dispatch({
+          type: "REMOVELINE",
+          line: line
+        });
+      });
+
+      store.dispatch({ type: "SETDOCUMENTNO" });
+
+      //BACKBONE UI INTEGRATION
+      receipt.on("change:documentNo", function(model) {
+        document.getElementById("documentNoBackbone").innerHTML = model.get(
+          "documentNo"
+        );
+      });
+      receipt.on("change:totalGross", function(model) {
+        document.getElementById("grossBackbone").innerHTML = model.get(
+          "totalGross"
+        );
+      });
+      receipt.on("change:customer", function(model) {
+        document.getElementById("customerBackbone").innerHTML = model.get(
+          "customer"
+        );
+      });
+      receipt.get("lines").on("add remove ", function(line, lines) {
+        document.getElementById("linesBackbone").innerHTML = JSON.stringify(
+          lines.toJSON()
+        );
+      });
+      receipt.get("lines").on(" reset", function(lines) {
+        document.getElementById("linesBackbone").innerHTML = JSON.stringify(
+          lines.toJSON()
+        );
+      });
+
+      document
+        .getElementById("addlinebackbone")
+        .addEventListener("click", function() {
+          receipt
+            .get("lines")
+            .add(
+              new Backbone.Model({ product: "adhesive body warmers", gross: 5 })
+            );
+        });
+      document
+        .getElementById("removelinebackbone")
+        .addEventListener("click", function() {
+          receipt.get("lines").pop();
+        });
+
+      //REDUX UI INTEGRATION
+
+      const updateViewWithState = function() {
+        let currentState = store.getState();
+        document.getElementById("documentNo").innerHTML =
+          currentState.documentNo;
+        document.getElementById("customer").innerHTML = currentState.customer;
+        document.getElementById("gross").innerHTML = currentState.totalGross;
+        document.getElementById("lines").innerHTML = JSON.stringify(
+          currentState.lines
+        );
+      };
+
+      store.subscribe(updateViewWithState);
+
+      document.getElementById("addline").addEventListener("click", function() {
+        store.dispatch({
+          type: "ADDLINE",
+          line: { product: "adhesive body warmers", gross: 5 }
+        });
+      });
+      document
+        .getElementById("removeline")
+        .addEventListener("click", function() {
+          store.dispatch({
+            type: "REMOVELINE"
+          });
+        });
+    </script>
+  </body>
+</html>
