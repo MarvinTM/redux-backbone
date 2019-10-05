@@ -1,0 +1,98 @@
+<html>
+  <head>
+    <title>Redux testing test</title>
+    <script src="https://unpkg.com/redux@latest/dist/redux.js"></script>
+  </head>
+  <body>
+    <div>
+      <p>DocumentNo: <span id="documentNo"></span></p>
+      <p>Customer: <span id="customer"></span></p>
+      <p>Lines: [<span id="lines"></span>]</p>
+      <p>Gross: <span id="gross"></span></p>
+      <p>
+        <button id="addline">+</button>
+        <button id="removeline">-</button>
+        <button id="completeTicket">Complete ticket</button>
+      </p>
+    </div>
+    <script>
+      let seq = 0;
+
+      const getNewDocNo = function() {
+        return seq++;
+      };
+
+      const defaultState = {
+        totalGross: 0,
+        lines: [],
+        documentNo: null,
+        customer: "Anonymous"
+      };
+
+      const order = function(state = {}, action) {
+        function calculateGross(state) {
+          if (state.lines) {
+            state.totalGross = state.lines.reduce(
+              (total, line) => total + line.gross,
+              0
+            );
+          } else {
+            state.totalGross = 0;
+          }
+        }
+        let newState;
+        switch (action.type) {
+          case "SETDOCUMENTNO":
+            newState = { ...state };
+            newState.documentNo = getNewDocNo();
+            return newState;
+          case "ADDLINE":
+            newState = { ...state };
+            newState.lines = [...state.lines, action.line];
+            calculateGross(newState);
+            return newState;
+          case "REMOVELINE":
+            newState = { ...state };
+            const newLines = [...state.lines];
+            newLines.pop();
+            newState.lines = newLines;
+            calculateGross(newState);
+            return newState;
+          default:
+            return state;
+        }
+      };
+
+      const store = Redux.createStore(order, defaultState);
+
+      const updateViewWithState = function() {
+        let currentState = store.getState();
+        document.getElementById("documentNo").innerHTML =
+          currentState.documentNo;
+        document.getElementById("customer").innerHTML = currentState.customer;
+        document.getElementById("gross").innerHTML = currentState.totalGross;
+        document.getElementById("lines").innerHTML = JSON.stringify(
+          currentState.lines
+        );
+      };
+
+      store.subscribe(updateViewWithState);
+
+      store.dispatch({ type: "SETDOCUMENTNO" });
+
+      document.getElementById("addline").addEventListener("click", function() {
+        store.dispatch({
+          type: "ADDLINE",
+          line: { product: "adhesive body warmers", gross: 5 }
+        });
+      });
+      document
+        .getElementById("removeline")
+        .addEventListener("click", function() {
+          store.dispatch({
+            type: "REMOVELINE"
+          });
+        });
+    </script>
+  </body>
+</html>
